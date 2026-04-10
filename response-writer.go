@@ -38,7 +38,22 @@ func WriteJSON(w http.ResponseWriter, status int, data interface{}, headers http
 
 // Writes an error response, will try to match list of recognized error to decide
 // the http status code
-func WriteError(w http.ResponseWriter, err d.FieldError) {
+
+// Common error
+func WriteCommonError(w http.ResponseWriter, err d.CommonError) {
+	httpCode := http.StatusUnprocessableEntity
+	for idx, code := range ErrorCodes {
+		if err.Code == idx {
+			httpCode = code
+			break
+		}
+	}
+
+	WriteJSON(w, httpCode, err, nil)
+}
+
+// Field error
+func WriteFieldError(w http.ResponseWriter, err d.FieldError) {
 	httpCode := http.StatusUnprocessableEntity
 	for idx, code := range ErrorCodes {
 		if err.Code == idx {
@@ -67,9 +82,11 @@ func DataResponse(w http.ResponseWriter, data, err any) {
 		if stringErr, ok := err.(string); ok {
 			WriteJSON(w, http.StatusUnprocessableEntity, d.IS{"Message": stringErr}, nil)
 		} else {
-			if castedErr, ok := err.(d.FieldError); ok {
+			if castedErr, ok := err.(d.CommonError); ok {
+				WriteCommonError(w, castedErr)
+			} else if castedErr, ok := err.(d.FieldError); ok {
 				// this is the only error that can have non unprocessable entity error
-				WriteError(w, castedErr)
+				WriteFieldError(w, castedErr)
 			} else if castedErr, ok := err.(d.FieldErrors); ok {
 				WriteJSON(w, http.StatusUnprocessableEntity, d.II{
 					"meta":   d.IS{"count": strconv.Itoa(len(castedErr))},
